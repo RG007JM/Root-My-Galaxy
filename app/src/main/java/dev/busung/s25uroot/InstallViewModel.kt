@@ -182,11 +182,14 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
                     appendLog(app.getString(R.string.log_shizuku_permission))
                 }
                 setPhase(InstallPhase.Checking, app.getString(R.string.status_checking_github))
+                val deviceSnapshot = DeviceSnapshot.current()
                 val profile = if (profileId == null) {
-                    repository.resolveTarget(DeviceSnapshot.current())
+                    repository.resolveTarget(deviceSnapshot)
                 } else {
                     repository.resolveTarget(profileId)
                 }
+                // Manual catalog selection must not bypass firmware-specific target checks.
+                require(profile.matches(deviceSnapshot)) { app.getString(R.string.repo_no_profile) }
                 appendLog(app.getString(R.string.log_profile, profile.profileId))
                 updateHistoryProfile(profile.profileId)
                 require(!profile.requiresShizuku || shizukuEnabled()) {

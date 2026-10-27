@@ -16,6 +16,8 @@ data class TargetProfile(
     val requiresShizuku: Boolean = false,
     val exploit: RemoteArtifact,
     val kernelSu: RemoteArtifact,
+    // Optional exact Build.DISPLAY values for firmware-specific offsets.
+    val buildDisplays: Set<String> = emptySet(),
 ) {
     init {
         require(models.isNotEmpty()) { "Payload must support at least one model" }
@@ -29,7 +31,9 @@ data class TargetProfile(
         snapshot.kernelVersion in kernelVersions
 
     fun matches(snapshot: DeviceSnapshot): Boolean =
-        matchesDevice(snapshot) && matchesKernelVersion(snapshot)
+        matchesDevice(snapshot) &&
+            matchesKernelVersion(snapshot) &&
+            (buildDisplays.isEmpty() || snapshot.buildId in buildDisplays)
 
     val supportedModels: String
         get() = models.joinToString()
@@ -68,6 +72,7 @@ data class SupportManifest(
                                 url = kernelSu.getString("url"),
                                 size = kernelSu.getLong("size"),
                             ),
+                            buildDisplays = payload.optJSONArray("buildDisplays")?.strings() ?: emptySet(),
                         ),
                     )
                 }
