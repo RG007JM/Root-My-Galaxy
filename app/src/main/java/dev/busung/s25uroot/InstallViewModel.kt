@@ -182,13 +182,28 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
                     appendLog(app.getString(R.string.log_shizuku_permission))
                 }
                 setPhase(InstallPhase.Checking, app.getString(R.string.status_checking_github))
+                val deviceSnapshot = DeviceSnapshot.current()
                 val profile = if (profileId == null) {
-                    repository.resolveTarget(DeviceSnapshot.current())
+                    repository.resolveTarget(deviceSnapshot)
                 } else {
                     repository.resolveTarget(profileId)
                 }
+                // Manual catalog selection must not bypass firmware-specific target checks.
+                require(profile.matches(deviceSnapshot)) { app.getString(R.string.repo_no_profile) }
                 appendLog(app.getString(R.string.log_profile, profile.profileId))
                 updateHistoryProfile(profile.profileId)
+                require(!profile.requiresShizuku || shizukuEnabled()) {
+                    app.getString(R.string.error_profile_requires_shizuku, profile.displayName)
+                }
+
+                val uptimeMs = SystemClock.elapsedRealtime()
+                if (uptimeMs < MIN_BOOT_SETTLE_MILLIS) {
+                    val remainingSec = (MIN_BOOT_SETTLE_MILLIS - uptimeMs + 999) / 1000
+                    appendLog(app.getString(R.string.log_boot_settle_wait, remainingSec))
+                    delay(MIN_BOOT_SETTLE_MILLIS - uptimeMs)
+                }
+                appendLog(app.getString(R.string.log_boot_settled,
+                    SystemClock.elapsedRealtime() / 60_000))
 
                 setPhase(InstallPhase.Downloading, app.getString(R.string.status_downloading_payload))
                 val payloads = repository.download(profile) { appendLog("[*] $it") }
@@ -547,6 +562,7 @@ class InstallViewModel(application: Application) : AndroidViewModel(application)
         private const val EXPLOIT_ATTEMPTS = "24"
         private const val P0_ATTEMPT_TIMEOUT_SEC = "45"
         private const val EXPLOIT_ATTEMPT_TIMEOUT_SEC = "120"
+        private const val MIN_BOOT_SETTLE_MILLIS = 120_000L
         private const val EXPLOIT_STALL_MILLIS = 90_000L
         private const val EXPLOIT_TOTAL_MILLIS = 900_000L
         private const val HELPER_TIMEOUT_MILLIS = 120_000L
